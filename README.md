@@ -106,3 +106,20 @@ Click **Refresh insights** at any time to force the backend to reload data from 
 - **CORS or browser errors** – the frontend is served by Flask, so load the app through `http://127.0.0.1:5000/` rather than opening `static/index.html` directly.
 
 With these steps you can run the dashboard locally, validate the API surface, and iterate on additional insights confidently.
+└── README.md
+```
+
+## Extending the dataset
+
+To analyse additional problems, append entries to `data/problems.json`. Each problem supports the following fields:
+
+- `id`: Numerical identifier (not required to match real LeetCode IDs, but should be unique).
+- `title`: Problem name.
+- `url`: Direct link to the problem statement.
+- `difficulty`: One of `Easy`, `Medium`, or `Hard`.
+- `topic`: Primary category such as `Array`, `Graph`, or `Dynamic Programming`.
+- `patterns`: Array of key techniques leveraged in the solution.
+- `summary`: One-sentence explanation of the core idea.
+- `key_steps`: Bullet-point breakdown for the solution approach.
+
+Click **Refresh insights** at any time to force the backend to reload data from the MCP server (or the local JSON if you are offline). The backend automatically recalculates category distributions, pattern spotlights, and the guided tutorial each time data is reloaded.
