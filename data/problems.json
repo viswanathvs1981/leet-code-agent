@@ -1,0 +1,212 @@
+[
+  {
+    "id": 1,
+    "title": "Two Sum",
+    "url": "https://leetcode.com/problems/two-sum/",
+    "difficulty": "Easy",
+    "topic": "Array",
+    "patterns": ["Hash Map Lookup"],
+    "summary": "Use a hash map to store complements while scanning the array once.",
+    "key_steps": [
+      "Iterate through the array while storing needed complements in a dictionary.",
+      "Check if the current value already exists as a complement.",
+      "Return indices when a complement pair is found."
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Best Time to Buy and Sell Stock",
+    "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/",
+    "difficulty": "Easy",
+    "topic": "Array",
+    "patterns": ["Greedy", "Sliding Window"],
+    "summary": "Track the minimum price so far and compute the best profit in one pass.",
+    "key_steps": [
+      "Maintain the smallest price encountered so far.",
+      "Calculate profit by subtracting the minimum from the current price.",
+      "Update the best profit accordingly."
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Valid Anagram",
+    "url": "https://leetcode.com/problems/valid-anagram/",
+    "difficulty": "Easy",
+    "topic": "String",
+    "patterns": ["Hash Map Lookup", "Counting"],
+    "summary": "Count character frequencies and compare to determine if two strings are anagrams.",
+    "key_steps": [
+      "Count characters of the first string using a dictionary or array.",
+      "Decrement counts using the second string.",
+      "Ensure all counts return to zero."
+    ]
+  },
+  {
+    "id": 4,
+    "title": "Merge Two Sorted Lists",
+    "url": "https://leetcode.com/problems/merge-two-sorted-lists/",
+    "difficulty": "Easy",
+    "topic": "Linked List",
+    "patterns": ["Two Pointers"],
+    "summary": "Use two pointers to merge two sorted linked lists into one sorted list.",
+    "key_steps": [
+      "Initialize a dummy head and a tail pointer.",
+      "Advance the pointer pointing to the smaller current node.",
+      "Attach remaining nodes when one list is exhausted."
+    ]
+  },
+  {
+    "id": 5,
+    "title": "Binary Tree Level Order Traversal",
+    "url": "https://leetcode.com/problems/binary-tree-level-order-traversal/",
+    "difficulty": "Medium",
+    "topic": "Tree",
+    "patterns": ["Breadth-First Search"],
+    "summary": "Traverse the binary tree level by level using a queue.",
+    "key_steps": [
+      "Add the root to a queue and iterate while the queue is not empty.",
+      "Process all nodes in the current level before moving to the next level.",
+      "Collect node values per level for the result."
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Number of Islands",
+    "url": "https://leetcode.com/problems/number-of-islands/",
+    "difficulty": "Medium",
+    "topic": "Graph",
+    "patterns": ["Depth-First Search", "Breadth-First Search"],
+    "summary": "Count connected components in a grid by exploring each unvisited land cell.",
+    "key_steps": [
+      "Iterate through the grid and start a search whenever you see unvisited land.",
+      "Use DFS or BFS to mark all connected land as visited.",
+      "Increment the island count for each completed traversal."
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Longest Substring Without Repeating Characters",
+    "url": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+    "difficulty": "Medium",
+    "topic": "String",
+    "patterns": ["Sliding Window"],
+    "summary": "Use a sliding window to expand and shrink the substring while tracking character positions.",
+    "key_steps": [
+      "Maintain a window with unique characters using a hash map for indices.",
+      "Shrink the window when a duplicate is encountered.",
+      "Update the maximum length at each step."
+    ]
+  },
+  {
+    "id": 8,
+    "title": "3Sum",
+    "url": "https://leetcode.com/problems/3sum/",
+    "difficulty": "Medium",
+    "topic": "Array",
+    "patterns": ["Sorting", "Two Pointers"],
+    "summary": "Sort the array and use a two-pointer approach to find triplets that sum to zero.",
+    "key_steps": [
+      "Sort the array and fix one index.",
+      "Use two pointers to scan for complement pairs.",
+      "Skip duplicates to avoid repeated triplets."
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Course Schedule",
+    "url": "https://leetcode.com/problems/course-schedule/",
+    "difficulty": "Medium",
+    "topic": "Graph",
+    "patterns": ["Topological Sort", "Depth-First Search"],
+    "summary": "Detect cycles in a directed graph to determine if all courses can be finished.",
+    "key_steps": [
+      "Represent prerequisites as a directed graph.",
+      "Perform DFS with states to detect cycles or use Kahn's algorithm.",
+      "Return true if no cycles are found."
+    ]
+  },
+  {
+    "id": 10,
+    "title": "Word Break",
+    "url": "https://leetcode.com/problems/word-break/",
+    "difficulty": "Medium",
+    "topic": "Dynamic Programming",
+    "patterns": ["Dynamic Programming", "Trie"],
+    "summary": "Use dynamic programming to determine if the string can be segmented into dictionary words.",
+    "key_steps": [
+      "Initialize a boolean DP array where dp[i] indicates the prefix up to i is segmentable.",
+      "Iterate over the string and check dictionary words that end at the current index.",
+      "Return the value of the last DP entry."
+    ]
+  },
+  {
+    "id": 11,
+    "title": "Climbing Stairs",
+    "url": "https://leetcode.com/problems/climbing-stairs/",
+    "difficulty": "Easy",
+    "topic": "Dynamic Programming",
+    "patterns": ["Dynamic Programming", "Fibonacci"],
+    "summary": "Compute the nth Fibonacci number to determine distinct ways to climb stairs.",
+    "key_steps": [
+      "Recognize the recurrence f(n) = f(n-1) + f(n-2).",
+      "Iterate from the base cases up to n while storing the last two values.",
+      "Return the nth value."
+    ]
+  },
+  {
+    "id": 12,
+    "title": "LRU Cache",
+    "url": "https://leetcode.com/problems/lru-cache/",
+    "difficulty": "Medium",
+    "topic": "Design",
+    "patterns": ["Linked List", "Hash Map"],
+    "summary": "Combine a hash map with a doubly linked list to achieve O(1) get and put operations.",
+    "key_steps": [
+      "Use a hash map to map keys to nodes in the linked list.",
+      "Move nodes to the front on access and remove from the tail when capacity is exceeded.",
+      "Update pointers carefully to maintain the structure."
+    ]
+  },
+  {
+    "id": 13,
+    "title": "Median of Two Sorted Arrays",
+    "url": "https://leetcode.com/problems/median-of-two-sorted-arrays/",
+    "difficulty": "Hard",
+    "topic": "Binary Search",
+    "patterns": ["Binary Search", "Partition"],
+    "summary": "Use binary search on the smaller array to find a partition where left halves are less than right halves.",
+    "key_steps": [
+      "Ensure the first array is the smaller one for binary searching.",
+      "Use binary search to partition the arrays into balanced halves.",
+      "Compute the median based on the partition boundaries."
+    ]
+  },
+  {
+    "id": 14,
+    "title": "Regular Expression Matching",
+    "url": "https://leetcode.com/problems/regular-expression-matching/",
+    "difficulty": "Hard",
+    "topic": "Dynamic Programming",
+    "patterns": ["Dynamic Programming", "Recursive Backtracking"],
+    "summary": "Use dynamic programming to handle '.' and '*' wildcard matching rules.",
+    "key_steps": [
+      "Define dp[i][j] as whether s[i:] matches p[j:].",
+      "Handle '.' by matching any single character and '*' by zero or more occurrences.",
+      "Fill the DP table bottom-up or top-down with memoization."
+    ]
+  },
+  {
+    "id": 15,
+    "title": "Alien Dictionary",
+    "url": "https://leetcode.com/problems/alien-dictionary/",
+    "difficulty": "Hard",
+    "topic": "Graph",
+    "patterns": ["Topological Sort", "Graph Construction"],
+    "summary": "Construct ordering constraints from sorted words and perform a topological sort.",
+    "key_steps": [
+      "Compare adjacent words to deduce ordering edges.",
+      "Build an adjacency list and in-degree counts.",
+      "Run Kahn's algorithm and detect cycles if result length mismatches."
+    ]
+  }
+]
