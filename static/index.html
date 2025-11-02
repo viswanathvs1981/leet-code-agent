@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LeetCode Pattern Explorer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="hero">
+        <h1>LeetCode Pattern Explorer</h1>
+        <p>
+          Explore problem categories, master recurring patterns, and build a tailored study plan.
+        </p>
+        <p id="data-source" class="data-source"></p>
+        <button id="refresh-button" class="primary-button">Refresh insights</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="categories" class="panel">
+        <h2>Category Overview</h2>
+        <p class="section-description">
+          Review the core areas covered by the curated LeetCode dataset. Each card highlights how often a topic appears and which techniques dominate it.
+        </p>
+        <div id="category-list" class="card-grid"></div>
+      </section>
+
+      <section id="patterns" class="panel">
+        <h2>Pattern Spotlights</h2>
+        <p class="section-description">
+          Discover techniques that cut across multiple topics. Open a card to explore why the pattern matters and sample problems that reinforce it.
+        </p>
+        <div id="pattern-list" class="card-grid"></div>
+      </section>
+
+      <section id="tutorial" class="panel">
+        <h2>Guided Tutorial</h2>
+        <p class="section-description">
+          Follow this high-level roadmap to progress from fundamentals to pattern synthesis. Each stage suggests concrete actions.
+        </p>
+        <div id="tutorial-content"></div>
+      </section>
+
+      <section id="questions" class="panel">
+        <h2>Ask the Agent</h2>
+        <p class="section-description">
+          Curious how to tackle a topic or which problems to practice? Ask a question that mentions a category, pattern, or difficulty level.
+        </p>
+        <form id="question-form">
+          <label for="question-input">Your question</label>
+          <div class="question-row">
+            <input id="question-input" type="text" placeholder="How do I approach dynamic programming problems?" required />
+            <button class="primary-button" type="submit">Ask</button>
+          </div>
+        </form>
+        <div id="question-response" class="response"></div>
+        <ul id="related-problems" class="problem-list"></ul>
+      </section>
+
+      <section id="problem-catalog" class="panel">
+        <h2>Problem Catalog</h2>
+        <p class="section-description">
+          Browse the curated problems that feed the agent. Use it to jump straight into practice once you select a pattern.
+        </p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Topic</th>
+                <th>Patterns</th>
+                <th>Difficulty</th>
+              </tr>
+            </thead>
+            <tbody id="problem-table"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>Built with a lightweight Flask backend &amp; vanilla JavaScript frontend.</p>
+    </footer>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
