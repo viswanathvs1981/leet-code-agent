@@ -1,0 +1,93 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AZURE_WEBAPP_NAME: leetcode-agent-app-${{ github.event.inputs.environment || 'dev' }}
+  AZURE_RESOURCE_GROUP: leetcode-agent-rg-${{ github.event.inputs.environment || 'dev' }}
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v
+
+    - name: Lint code
+      run: |
+        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy infrastructure
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        cd infrastructure
+        chmod +x deploy.sh
+        ./deploy.sh --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --environment ${{ env.ENVIRONMENT }}
+
+    - name: Build and push Docker image
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Build Docker image
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/leetcode-agent:${{ github.sha }} .
+
+    - name: Push Docker image
+      run: |
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/leetcode-agent:${{ github.sha }}
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        images: ${{ secrets.ACR_LOGIN_SERVER }}/leetcode-agent:${{ github.sha }}
+
+    - name: Run health check
+      run: |
+        sleep 30  # Wait for deployment to complete
+        curl -f https://$AZURE_WEBAPP_NAME.azurewebsites.net/api/system-status || exit 1
+
+    - name: Azure logout
+      run: |
+        az logout

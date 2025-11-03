@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  leetcode-agent:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=true
+      - MAX_CONCURRENT_REQUESTS=5
+      - CACHE_TTL_SECONDS=3600
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/system-status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: LeetCode MCP Server for enhanced data access
+  leetcode-mcp-server:
+    image: node:18-alpine
+    ports:
+      - "3333:3333"
+    environment:
+      - LEETCODE_SESSION=${LEETCODE_SESSION:-}
+    command: >
+      sh -c "
+      npm install -g @jinzcdev/leetcode-mcp-server &&
+      leetcode-mcp-server --port 3333
+      "
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

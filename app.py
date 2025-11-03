@@ -13,6 +13,16 @@ from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+
+# Import our new components
+from mcp_client import LeetCodeMCPClient
+from problem_analyzer import ProblemAnalyzer
+from tutorial_generator import TutorialGenerator
+from solution_generator import SolutionGenerator
+from enhanced_agent import EnhancedAgent
+from pattern_mastery_tracker import PatternMasteryTracker
+from azure_services import cosmos_service, blob_service
 
 
 logging.basicConfig(level=logging.INFO)
@@ -315,13 +325,23 @@ def answer_question(
 
 
 app = Flask(__name__, static_folder="static", static_url_path="")
+CORS(app)  # Enable CORS for frontend requests
 
+# Global data stores
 PROBLEMS: List[Dict[str, Any]]
 CATEGORIES: Dict[str, Any]
 PATTERNS: Dict[str, Any]
 TUTORIAL: Dict[str, Any]
 DATA_SOURCE: str
 LAST_REFRESHED_AT: datetime
+
+# Initialize new services
+mcp_client = LeetCodeMCPClient(base_url=os.getenv("LEETCODE_MCP_SERVER", "http://localhost:3333"))
+problem_analyzer = ProblemAnalyzer()
+tutorial_generator = TutorialGenerator()
+solution_generator = SolutionGenerator()
+enhanced_agent = EnhancedAgent()
+mastery_tracker = PatternMasteryTracker()
 
 
 def initialise_data() -> Tuple[List[Dict[str, Any]], Dict[str, Any], Dict[str, Any], Dict[str, Any], str, datetime]:
@@ -404,6 +424,515 @@ def refresh_data() -> Any:
             "last_refreshed": LAST_REFRESHED_AT.isoformat() if LAST_REFRESHED_AT else None,
         }
     )
+
+
+# New API endpoints for enhanced functionality
+
+@app.route("/api/crawl-problems", methods=["POST"])
+def crawl_problems() -> Any:
+    """Fetch LeetCode problems using MCP server"""
+    try:
+        logger.info("Fetching LeetCode problems via MCP server...")
+
+        # Check if MCP server is available
+        if not mcp_client.is_healthy():
+            return jsonify({
+                "status": "error",
+                "message": "MCP server is not available. Please ensure the leetcode-mcp-server is running."
+            }), 503
+
+        # Get all problems via MCP
+        payload = request.get_json(silent=True) or {}
+        category = payload.get("category", "all-code-essentials")
+        limit = payload.get("limit", 1000)  # Default to 1000 problems
+
+        problems = mcp_client.get_all_problems(category=category, limit=limit)
+
+        if not problems:
+            return jsonify({
+                "status": "error",
+                "message": "No problems retrieved from MCP server"
+            }), 500
+
+        # Save to CosmosDB
+        saved_count = 0
+        for problem in problems:
+            if cosmos_service.save_problem(problem):
+                saved_count += 1
+
+        # Analyze problems with AI (sample for performance)
+        analysis_sample = problems[:min(100, len(problems))]  # Analyze first 100 problems
+        analyzed_problems = problem_analyzer.analyze_problems_batch(analysis_sample)
+
+        # Identify patterns from analyzed problems
+        patterns = problem_analyzer.identify_patterns(analyzed_problems)
+
+        # Save patterns to CosmosDB
+        patterns_saved = 0
+        for pattern in patterns:
+            if cosmos_service.save_pattern(pattern):
+                patterns_saved += 1
+
+        # Update global data
+        global PROBLEMS, CATEGORIES, PATTERNS, TUTORIAL, DATA_SOURCE, LAST_REFRESHED_AT
+        PROBLEMS = analyzed_problems + [p for p in problems if p not in analyzed_problems]
+        CATEGORIES = build_category_summary(PROBLEMS)
+        PATTERNS = build_pattern_summary(PROBLEMS)
+        TUTORIAL = build_tutorial(CATEGORIES, PATTERNS)
+        DATA_SOURCE = "LeetCode MCP Server + AI Analysis"
+        LAST_REFRESHED_AT = datetime.utcnow().replace(microsecond=0)
+
+        return jsonify({
+            "status": "success",
+            "problems_fetched": len(problems),
+            "problems_saved": saved_count,
+            "problems_analyzed": len(analyzed_problems),
+            "patterns_identified": len(patterns),
+            "patterns_saved": patterns_saved,
+            "data_source": DATA_SOURCE,
+            "last_refreshed": LAST_REFRESHED_AT.isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to fetch problems via MCP: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/analyze-problems", methods=["POST"])
+def analyze_problems() -> Any:
+    """Analyze existing problems with AI"""
+    try:
+        # Get problems from CosmosDB
+        problems = cosmos_service.get_all_problems()
+        if not problems:
+            return jsonify({"status": "error", "message": "No problems found to analyze"}), 404
+
+        logger.info(f"Analyzing {len(problems)} problems...")
+        analyzed_problems = problem_analyzer.analyze_problems_batch(problems)
+
+        # Save analyzed problems back to CosmosDB
+        saved_count = 0
+        for problem in analyzed_problems:
+            if cosmos_service.save_problem(problem):
+                saved_count += 1
+
+        # Identify patterns
+        patterns = problem_analyzer.identify_patterns(analyzed_problems)
+
+        # Save patterns to CosmosDB
+        patterns_saved = 0
+        for pattern in patterns:
+            if cosmos_service.save_pattern(pattern):
+                patterns_saved += 1
+
+        return jsonify({
+            "status": "success",
+            "problems_analyzed": len(analyzed_problems),
+            "problems_saved": saved_count,
+            "patterns_identified": len(patterns),
+            "patterns_saved": patterns_saved
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to analyze problems: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/generate-tutorials", methods=["POST"])
+def generate_tutorials() -> Any:
+    """Generate tutorials for all patterns"""
+    try:
+        patterns = cosmos_service.get_all_patterns()
+        problems = cosmos_service.get_all_problems()
+
+        if not patterns:
+            return jsonify({"status": "error", "message": "No patterns found to generate tutorials"}), 404
+
+        logger.info(f"Generating tutorials for {len(patterns)} patterns...")
+        tutorials = tutorial_generator.generate_all_tutorials(patterns, problems)
+
+        return jsonify({
+            "status": "success",
+            "tutorials_generated": len(tutorials),
+            "patterns": list(tutorials.keys())
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to generate tutorials: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/generate-solutions", methods=["POST"])
+def generate_solutions() -> Any:
+    """Generate solutions for problems"""
+    try:
+        problems = cosmos_service.get_all_problems()
+        if not problems:
+            return jsonify({"status": "error", "message": "No problems found to generate solutions"}), 404
+
+        logger.info(f"Generating solutions for {len(problems)} problems...")
+        solutions = solution_generator.generate_solutions_batch(problems, limit=100)  # Limit for demo
+
+        return jsonify({
+            "status": "success",
+            "solutions_generated": len(solutions),
+            "problem_ids": list(solutions.keys())
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to generate solutions: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/tutorial/<pattern_name>")
+def get_tutorial(pattern_name: str) -> Any:
+    """Get a tutorial for a specific pattern"""
+    try:
+        tutorial = tutorial_generator.get_tutorial(pattern_name)
+        if tutorial:
+            return jsonify({"tutorial": tutorial})
+        else:
+            return jsonify({"error": "Tutorial not found"}), 404
+    except Exception as e:
+        logger.error(f"Failed to get tutorial: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/solution/<problem_id>")
+def get_solution(problem_id: str) -> Any:
+    """Get a solution for a specific problem"""
+    try:
+        solution = solution_generator.get_solution(problem_id)
+        if solution:
+            return jsonify({"solution": solution})
+        else:
+            return jsonify({"error": "Solution not found"}), 404
+    except Exception as e:
+        logger.error(f"Failed to get solution: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ask-agent", methods=["POST"])
+def ask_agent() -> Any:
+    """Enhanced Q&A with the intelligent agent"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        question = payload.get("question", "")
+        user_context = payload.get("user_context", {})
+
+        if not question:
+            return jsonify({"error": "Question is required"}), 400
+
+        response = enhanced_agent.ask_question(question, user_context)
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Agent question failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-progress/<user_id>")
+def get_user_progress(user_id: str) -> Any:
+    """Get user learning progress"""
+    try:
+        progress = mastery_tracker.get_user_progress(user_id)
+        if progress:
+            return jsonify(progress)
+        else:
+            return jsonify({"error": "User progress not found"}), 404
+    except Exception as e:
+        logger.error(f"Failed to get user progress: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-progress/<user_id>/mastered-patterns")
+def get_mastered_patterns(user_id: str) -> Any:
+    """Get patterns the user has mastered"""
+    try:
+        mastered = mastery_tracker.get_mastered_patterns(user_id)
+        return jsonify({"mastered_patterns": mastered})
+    except Exception as e:
+        logger.error(f"Failed to get mastered patterns: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-progress/<user_id>/recommendations")
+def get_learning_recommendations(user_id: str) -> Any:
+    """Get personalized learning recommendations"""
+    try:
+        recommendations = mastery_tracker.get_learning_recommendations(user_id)
+        return jsonify(recommendations)
+    except Exception as e:
+        logger.error(f"Failed to get recommendations: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-progress/<user_id>/study-plan")
+def get_study_plan(user_id: str) -> Any:
+    """Get personalized study plan"""
+    try:
+        days = int(request.args.get("days", 7))
+        study_plan = mastery_tracker.get_study_plan(user_id, days)
+        return jsonify(study_plan)
+    except Exception as e:
+        logger.error(f"Failed to get study plan: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-progress/<user_id>/update", methods=["POST"])
+def update_user_progress(user_id: str) -> Any:
+    """Update user progress after solving a problem"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        problem_id = payload.get("problem_id")
+        success = payload.get("success", False)
+        time_spent = payload.get("time_spent")
+        attempts = payload.get("attempts", 1)
+
+        if not problem_id:
+            return jsonify({"error": "problem_id is required"}), 400
+
+        success = mastery_tracker.update_user_progress(user_id, problem_id, success, time_spent, attempts)
+        if success:
+            return jsonify({"status": "success"})
+        else:
+            return jsonify({"error": "Failed to update progress"}), 500
+
+    except Exception as e:
+        logger.error(f"Failed to update user progress: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/problem-solutions/<title_slug>")
+def get_problem_solutions(title_slug: str) -> Any:
+    """Get community solutions for a problem"""
+    try:
+        payload = request.args
+        limit = int(payload.get("limit", 10))
+        order_by = payload.get("order_by", "HOT")
+
+        solutions = mcp_client.get_problem_solutions(title_slug, limit=limit, order_by=order_by)
+        return jsonify({"solutions": solutions})
+    except Exception as e:
+        logger.error(f"Failed to get solutions for {title_slug}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/solution/<path:solution_id>")
+def get_problem_solution(solution_id: str) -> Any:
+    """Get detailed content of a specific solution"""
+    try:
+        # Try topic ID first, then slug
+        solution = mcp_client.get_problem_solution(topic_id=solution_id)
+        if not solution:
+            solution = mcp_client.get_problem_solution(slug=solution_id)
+
+        if solution:
+            return jsonify({"solution": solution})
+        else:
+            return jsonify({"error": "Solution not found"}), 404
+    except Exception as e:
+        logger.error(f"Failed to get solution {solution_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-profile/<username>")
+def get_user_profile(username: str) -> Any:
+    """Get user profile information"""
+    try:
+        profile = mcp_client.get_user_profile(username)
+        if profile:
+            return jsonify(profile)
+        else:
+            return jsonify({"error": "User profile not found"}), 404
+    except Exception as e:
+        logger.error(f"Failed to get user profile for {username}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-contest-ranking/<username>")
+def get_user_contest_ranking(username: str) -> Any:
+    """Get user's contest ranking information"""
+    try:
+        attended = request.args.get("attended", "true").lower() == "true"
+        ranking = mcp_client.get_user_contest_ranking(username, attended=attended)
+        if ranking:
+            return jsonify(ranking)
+        else:
+            return jsonify({"error": "Contest ranking not found"}), 404
+    except Exception as e:
+        logger.error(f"Failed to get contest ranking for {username}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-submissions/<username>")
+def get_user_submissions(username: str) -> Any:
+    """Get user's recent submissions"""
+    try:
+        limit = int(request.args.get("limit", 10))
+        submission_type = request.args.get("type", "recent")  # recent, accepted
+
+        if submission_type == "accepted":
+            submissions = mcp_client.get_recent_ac_submissions(username, limit=limit)
+        else:
+            submissions = mcp_client.get_recent_submissions(username, limit=limit)
+
+        return jsonify({"submissions": submissions})
+    except Exception as e:
+        logger.error(f"Failed to get submissions for {username}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/problem-progress")
+def get_problem_progress() -> Any:
+    """Get user's problem-solving progress"""
+    try:
+        offset = int(request.args.get("offset", 0))
+        limit = int(request.args.get("limit", 100))
+        question_status = request.args.get("status")  # ATTEMPTED, SOLVED
+        difficulty = request.args.getlist("difficulty")  # Easy, Medium, Hard
+
+        progress = mcp_client.get_problem_progress(
+            offset=offset,
+            limit=limit,
+            question_status=question_status,
+            difficulty=difficulty if difficulty else None
+        )
+        return jsonify(progress)
+    except Exception as e:
+        logger.error(f"Failed to get problem progress: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/notes/search")
+def search_notes() -> Any:
+    """Search user notes"""
+    try:
+        keyword = request.args.get("keyword", "")
+        limit = int(request.args.get("limit", 10))
+        skip = int(request.args.get("skip", 0))
+        order_by = request.args.get("order_by", "DESCENDING")
+
+        notes = mcp_client.search_notes(
+            keyword=keyword,
+            limit=limit,
+            skip=skip,
+            order_by=order_by
+        )
+        return jsonify({"notes": notes})
+    except Exception as e:
+        logger.error(f"Failed to search notes: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/notes/problem/<question_id>")
+def get_problem_notes(question_id: str) -> Any:
+    """Get notes for a specific problem"""
+    try:
+        limit = int(request.args.get("limit", 10))
+        skip = int(request.args.get("skip", 0))
+
+        notes = mcp_client.get_note(question_id, limit=limit, skip=skip)
+        return jsonify({"notes": notes})
+    except Exception as e:
+        logger.error(f"Failed to get notes for problem {question_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/notes", methods=["POST"])
+def create_note() -> Any:
+    """Create a new note"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        question_id = payload.get("question_id")
+        content = payload.get("content", "")
+        summary = payload.get("summary", "")
+
+        if not question_id or not content:
+            return jsonify({"error": "question_id and content are required"}), 400
+
+        result = mcp_client.create_note(question_id, content, summary)
+        if result:
+            return jsonify(result)
+        else:
+            return jsonify({"error": "Failed to create note"}), 500
+    except Exception as e:
+        logger.error(f"Failed to create note: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/notes/<note_id>", methods=["PUT"])
+def update_note(note_id: str) -> Any:
+    """Update an existing note"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        content = payload.get("content", "")
+        summary = payload.get("summary", "")
+
+        if not content:
+            return jsonify({"error": "content is required"}), 400
+
+        result = mcp_client.update_note(note_id, content, summary)
+        if result:
+            return jsonify(result)
+        else:
+            return jsonify({"error": "Failed to update note"}), 500
+    except Exception as e:
+        logger.error(f"Failed to update note {note_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/metadata/categories")
+def get_problem_categories() -> Any:
+    """Get all problem categories"""
+    try:
+        categories = mcp_client.get_problem_categories()
+        return jsonify({"categories": categories})
+    except Exception as e:
+        logger.error(f"Failed to get problem categories: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/metadata/tags")
+def get_problem_tags() -> Any:
+    """Get all problem tags"""
+    try:
+        tags = mcp_client.get_problem_tags()
+        return jsonify({"tags": tags})
+    except Exception as e:
+        logger.error(f"Failed to get problem tags: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/metadata/languages")
+def get_supported_languages() -> Any:
+    """Get supported programming languages"""
+    try:
+        languages = mcp_client.get_supported_languages()
+        return jsonify({"languages": languages})
+    except Exception as e:
+        logger.error(f"Failed to get supported languages: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/system-status")
+def get_system_status() -> Any:
+    """Get system status and component health"""
+    try:
+        status = {
+            "cosmos_db": cosmos_service.client is not None,
+            "blob_storage": blob_service.client is not None,
+            "openai": problem_analyzer.client is not None,
+            "mcp_server": mcp_client.is_healthy(),
+            "total_problems": len(PROBLEMS) if PROBLEMS else 0,
+            "total_patterns": len(PATTERNS) if PATTERNS else 0,
+            "data_source": DATA_SOURCE,
+            "last_refreshed": LAST_REFRESHED_AT.isoformat() if LAST_REFRESHED_AT else None
+        }
+        return jsonify(status)
+    except Exception as e:
+        logger.error(f"Failed to get system status: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
